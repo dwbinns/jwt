@@ -1,0 +1,15 @@
+{
+    "name": "@dwbinns/jwt",
+    "version": "1.0.0",
+    "type": "module",
+    "exports": "./jwt.js",
+    "dependencies": {
+        "@dwbinns/base": "^1.0.0"
+    },
+    "workspaces": [
+        "deps/*"
+    ],
+    "scripts": {
+        "test": "node --test"
+    }
+}
