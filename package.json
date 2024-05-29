@@ -4,7 +4,7 @@
     "type": "module",
     "exports": "./jwt.js",
     "dependencies": {
-        "@dwbinns/base": "^1.0.0"
+        "@dwbinns/base": "^1.2.0"
     },
     "workspaces": [
         "deps/*"

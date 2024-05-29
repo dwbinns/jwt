@@ -12,7 +12,7 @@ const algorithms = {
         signatureParams: {
             name: 'RSASSA-PKCS1-v1_5',
         },
-        
+
     },
     "ES256": {
         importKeyParams: {
@@ -32,37 +32,46 @@ export function parse(text) {
     let header = JSON.parse(b64url.decodeText(headerEncoded));
     let claims = JSON.parse(b64url.decodeText(claimsEncoded));
     let signature = b64url.decode(signatureEncoded);
-    return { header, claims, signature };
+    let signed = `${headerEncoded}.${claimsEncoded}`;
+    return { header, claims, signature, signed };
 }
 
 
-export async function verify(key, text) {
-    let [headerEncoded, claimsEncoded, signatureEncoded] = text.trim().split(".");
-    let header = JSON.parse(b64url.decodeText(headerEncoded));
-    let claims = JSON.parse(b64url.decodeText(claimsEncoded));
-    let signature = b64url.decode(signatureEncoded);
+export async function verify(keys, text, now = new Date()) {
+    let { header, claims, signature, signed } = parse(text);
 
-    if (key) {
-        let { alg, kid, publicKey, } = key;
+    for (let key of Array.isArray(keys) ? keys : [keys]) {
+
+        let { alg, kid, publicKey } = key;
+
         let { signatureParams } = getParameters(alg);
 
         if (header.kid != kid || header.alg != alg) {
-            throw new Error("Header not set correctly");
+            continue;
         }
 
         let valid = await crypto.subtle.verify(
             signatureParams,
             publicKey,
             signature,
-            new TextEncoder().encode(`${headerEncoded}.${claimsEncoded}`)
+            new TextEncoder().encode(signed)
         );
 
         if (!valid) {
             throw new Error("JWT not valid");
         }
+
+        if (claims.exp) {
+            let epochSeconds = now.getTime() / 1e3;
+            if (claims.exp < epochSeconds) {
+                throw new Error("JWT expired")
+            }
+        }
+
+        return claims;
     }
 
-    return claims;
+    throw new Error("Key not known");
 }
 
 function getParameters(alg) {
@@ -101,20 +110,40 @@ export async function importPem(alg, kid, pem) {
 
     if (privateKey) {
         let privateJWK = await crypto.subtle.exportKey("jwk", privateKey);
-        let publicJWK = {...privateJWK, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined, key_ops: undefined};
+        let publicJWK = { ...privateJWK, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined, key_ops: undefined };
         publicKey = await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
     }
 
-    return { alg, kid, privateKey, publicKey };
+    return [{ alg, kid, privateKey, publicKey }];
+}
+
+export async function importHostJWKS(hostname) {
+    return await importURLJWKS(new URL(`https://${hostname}./well-known/jwks.json`));
+}
+
+export async function importURLJWKS(url) {
+    let response = await fetch(url)
+    if (!response.ok) throw new Error("JWKS fetch failed");
+
+    return await importJWKS(await response.json());
+}
+
+export async function importJWKS({ keys }) {
+    return await Promise.all(keys.map(async ({ alg, kid, ...jwk }) => {
+        if (!alg) return null;
+        let { importKeyParams } = getParameters(alg);
+        let publicKey = await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["verify"]);
+        return { alg, kid, publicKey };
+    }));
 }
 
 export async function importJWK(alg, kid, jwk) {
     let { importKeyParams } = getParameters(alg);
 
     let privateKey = jwk.d && await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["sign"]);
-    let publicJWK = {...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined};
+    let publicJWK = { ...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined };
     let publicKey = await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
-    return { alg, kid, privateKey, publicKey };
+    return [{ alg, kid, privateKey, publicKey }];
 }
 
 export function expiresTime(durationSeconds) {
@@ -125,7 +154,9 @@ export function expiresTime(durationSeconds) {
     };
 }
 
-export async function create(key, claims) {
+export async function create(keys, claims) {
+    let key = Array.isArray(keys) ? keys.filter(({ privateKey }) => privateKey).at(0) : keys;
+    if (!key) throw new Error("No private key supplied");
     let { alg, kid, privateKey } = key;
     let { signatureParams } = getParameters(alg);
 
