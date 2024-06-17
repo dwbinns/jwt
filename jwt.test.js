@@ -32,7 +32,7 @@ await test("RS256", async () => {
     deepEqual(header, { alg: "RS256" });
     deepEqual(claims, exampleClaims);
 
-    
+
     deepEqual(await verify(keys[0], rsaJWT, new Date("2010")), exampleClaims);
     deepEqual(await verify(keys, rsaJWT, new Date("2010")), exampleClaims);
     await rejects(verify(keys, rsaJWT, new Date("2012")), new Error("JWT expired"));
@@ -42,22 +42,26 @@ await test("RS256", async () => {
 
 
 await test("JWKS", async () => {
-    
-    let keys = await importJWKS({
-        "keys": [
-            {
-                "kty": "EC",
-                "alg": "ES256",
-                "crv": "P-256",
-                "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
-                "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
-            }
-        ]
-    });
+    try {
+        let keys = await importJWKS({
+            "keys": [
+                {
+                    "kty": "EC",
+                    "alg": "ES256",
+                    "crv": "P-256",
+                    "d": "",
+                    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+                    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+                }
+            ]
+        });
 
-    let ecJWT = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
+        let ecJWT = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
 
-    ok(await verify(keys, ecJWT, new Date("2010")));
+        ok(await verify(keys, ecJWT, new Date("2010")));
+    } catch (e) {
+        throw new Error(e);
+    }
 });
 
 await test("PEM", async () => {

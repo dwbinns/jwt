@@ -128,11 +128,16 @@ export async function importURLJWKS(url) {
     return await importJWKS(await response.json());
 }
 
+export async function importPublic(alg, jwk) {
+    let { importKeyParams } = getParameters(alg);
+    let publicJWK = { ...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined };
+    return await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
+}
+
 export async function importJWKS({ keys }) {
     return await Promise.all(keys.map(async ({ alg, kid, ...jwk }) => {
         if (!alg) return null;
-        let { importKeyParams } = getParameters(alg);
-        let publicKey = await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["verify"]);
+        let publicKey = await importPublic(alg, jwk);
         return { alg, kid, publicKey };
     }));
 }
@@ -141,8 +146,7 @@ export async function importJWK(alg, kid, jwk) {
     let { importKeyParams } = getParameters(alg);
 
     let privateKey = jwk.d && await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["sign"]);
-    let publicJWK = { ...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined };
-    let publicKey = await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
+    let publicKey = await importPublic(alg, jwk);
     return [{ alg, kid, privateKey, publicKey }];
 }
 
