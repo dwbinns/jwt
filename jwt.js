@@ -61,10 +61,19 @@ export async function verify(keys, text, now = new Date()) {
             throw new Error("JWT not valid");
         }
 
+        let epochSeconds = now.getTime() / 1e3;
+
         if (claims.exp) {
             let epochSeconds = now.getTime() / 1e3;
             if (claims.exp < epochSeconds) {
                 throw new Error("JWT expired")
+            }
+        }
+
+        if (claims.iat) {
+
+            if (claims.iat > epochSeconds) {
+                throw new Error("JWT not yet valid")
             }
         }
 
@@ -128,7 +137,7 @@ export async function importURLJWKS(url) {
     return await importJWKS(await response.json());
 }
 
-export async function importPublic(alg, jwk) {
+async function importPublic(alg, jwk) {
     let { importKeyParams } = getParameters(alg);
     let publicJWK = { ...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined };
     return await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
@@ -156,6 +165,20 @@ export function expiresTime(durationSeconds) {
         iat: now,
         exp: now + durationSeconds,
     };
+}
+
+export function expiredFraction(jwt, createdAt, now = new Date()) {
+    const { claims } = parse(jwt);
+    let { exp, iat } = claims;
+    if (!exp) {
+        return 0;
+    }
+    if (!iat && !createdAt) {
+        throw new Error("No creation time or issued time available");
+    }
+    const created = createdAt ? createdAt.getTime() / 1e3 : iat;
+    const issuedAt = iat || createdAt.getTime() / 1e3;
+    return (now.getTime() / 1e3 - created) / (exp - issuedAt);
 }
 
 export async function create(keys, claims) {

@@ -9,6 +9,7 @@
     "workspaces": [
         "deps/*"
     ],
+    "repository": "github:dwbinns/jwt",
     "scripts": {
         "test": "node --test"
     }

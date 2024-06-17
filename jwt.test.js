@@ -84,7 +84,7 @@ await test("ES256", async () => {
         "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
         "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
         "d": "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
-    }
+    };
 
     let ecKey = await importJWK("ES256", undefined, ecJWK);
 
