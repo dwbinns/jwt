@@ -23,6 +23,14 @@ const algorithms = {
             name: "ECDSA",
             hash: "SHA-256",
         }
+    },
+    "EdDSA": {
+        importKeyParams: {
+            name: "Ed25519"
+        },
+        signatureParams: {
+            name: "Ed25519"
+        }
     }
 }
 
@@ -151,7 +159,7 @@ export async function importJWKS({ keys }) {
     }));
 }
 
-export async function importJWK(alg, kid, jwk) {
+export async function importJWK(alg, kid, {key_ops, ...jwk}) {
     let { importKeyParams } = getParameters(alg);
 
     let privateKey = jwk.d && await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["sign"]);
