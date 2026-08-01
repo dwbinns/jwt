@@ -1,16 +1,57 @@
 {
     "name": "@dwbinns/jwt",
-    "version": "1.2.2",
+    "version": "2.0.0",
     "type": "module",
-    "exports": "./jwt.js",
+    "exports": {
+        "./generate": {
+            "default": "./generate.ts"
+        },
+        "./verify": {
+            "default": "./verify.ts"
+        },
+        "./info": {
+            "default": "./info.ts"
+        }
+    },
+    "publishExports": {
+        "./generate": {
+            "types": "./dist/generate.d.ts",
+            "source": "./generate.ts",
+            "default": "./dist/generate.js"
+        },
+        "./verify": {
+            "types": "./dist/verify.d.ts",
+            "source": "./verify.ts",
+            "default": "./dist/verify.js"
+        },
+        "./info": {
+            "types": "./dist/info.d.ts",
+            "source": "./info.ts",
+            "default": "./dist/info.js"
+        }
+    },
+    "files": [
+        "dist",
+        "generate.ts",
+        "verify.ts",
+        "info.ts",
+        "common.ts"
+    ],
     "dependencies": {
         "@dwbinns/base": "^1.2.0"
+    },
+    "devDependencies": {
+        "@types/node": "^24.0.0",
+        "typescript": "^5.8.0"
     },
     "workspaces": [
         "deps/*"
     ],
     "repository": "github:dwbinns/jwt",
     "scripts": {
-        "test": "node --test"
+        "build": "tsc -p tsconfig.json",
+        "release": "npm run build && node publish.js",
+        "prepublishOnly": "node prepublish.js",
+        "test": "node --test jwt.test.ts"
     }
 }

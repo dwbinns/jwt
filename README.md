@@ -2,27 +2,38 @@
 
 Verify and create JWTs using async webcrypto.
 
-ES256 (ECDSA with P-256 and P-256) and RS256 (RSA with SHA-256)
+ES256 (ECDSA with P-256 and SHA-256) and RS256 (RSA with SHA-256)
+
+The package is split into three subpath exports:
+
+- `@dwbinns/jwt/generate` — private key import and JWT signing
+- `@dwbinns/jwt/verify` — public key import and JWT verification
+- `@dwbinns/jwt/info` — parsing and expiry helpers (no keys required)
 
 ```js
-import { importJWK, create, verify, expiresTime, expiredFraction } from "@dwbinns/jwt";
+import { create, importPrivateKey } from "@dwbinns/jwt/generate";
+import { verify, importPublicKey } from "@dwbinns/jwt/verify";
+import { expiredTime, expiredFraction } from "@dwbinns/jwt/info";
 
-const keys = await importJWK("ES256", "kid", {
+const jwk = {
     "kty": "EC",
     "crv": "P-256",
     "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
     "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
     "d": "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
-});
+};
 
-const jwt = await create(keys, {sub: "me", ...expiresTime(3600)});
+const key = await importPrivateKey("ES256", "kid", jwk);
+const publicKey = await importPublicKey("ES256", "kid", jwk);
+
+const jwt = await create(key, {sub: "me", ...expiredTime(3600)});
 console.log("JWT:", jwt);
 console.log(`Expired: ${expiredFraction(jwt) * 100}%`);
-const claims = await verify(keys, jwt);
+const claims = await verify(publicKey, jwt);
 console.log("Subject:", claims.sub); 
 console.log("Expires:", new Date(claims.exp * 1e3));
 try {
-    await verify(keys, "eyJraWQiOiJraWQiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtZSJ9.invalid");
+    await verify(publicKey, "eyJraWQiOiJraWQiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtZSJ9.invalid");
 } catch (e) {
     console.log("Verification error:", e.message);
 }
@@ -36,14 +47,15 @@ Expires: 2024-06-17T17:16:27.000Z
 Verification error: JWT not valid
 ```
 
+## `@dwbinns/jwt/info`
 
-## parse
+### parse
 ```javascript
 function parse(text)
 ```
 Synchronously parse a JWT without verification
 ```javascript
-import { parse } from "@dwbinns/jwt";
+import { parse } from "@dwbinns/jwt/info";
 console.log(parse("eyJraWQiOiJraWQiLCJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJtZSIsImlhdCI6MTcxODY0MDk4NywiZXhwIjoxNzE4NjQ0NTg3fQ.fNZx8X2p7AFrlN7RSnr0n3rnxVjN6raBbDZhEbiWNomRFofG2KXFX8AwRHtXTa86VNxR8wOXnNVnly80IMP2CA"));
 ```
 Returns all parts of the JWT, decoded:
@@ -63,47 +75,13 @@ Returns all parts of the JWT, decoded:
 }
 ```
 
-## verify
+### expiredTime
 ```javascript
-async function verify(keys, text, now = new Date())
-```
-
-Parse and verify a JWT, throwing an error if the JWT is expired, not yet valid or does not have a valid signature.
-Keys should be an array of keys created via one of the import functions.
-Returns the JWT's claims, see first example.
-
-## importPem
-```javascript
-async function importPem(alg, kid, pem)
-```
-Import a single key from a PEM file, supplying the algorithm (`alg`) and key id (`kid`) and pem as a string.
-Supports pkcs8 private keys (`BEGIN PRIVATE KEY`) and spki public keys (`BEGIN PUBLIC KEY`)
-
-## importHostJWKS
-```javascript
-function importHostJWKS(hostname)
-```
-Import all keys from a key set for a host
-
-## importURLJWKS
-```javascript
-async function importURLJWKS(url)
-```
-Import all keys from a key set from a URL
-
-## importJWKS
-```javascript
-async function importJWKS({ keys })
-```
-Import all keys from a key set
-
-## expiresTime
-```javascript
-function expiresTime(durationSeconds)
+function expiredTime(durationSeconds)
 ```
 Create claims that are issued now and expire in `durationSeconds`
 
-## expiredFraction
+### expiredFraction
 ```javascript
 function expiredFraction(jwt, createdAt, now = new Date())
 ```
@@ -115,11 +93,69 @@ If supplied then clock skew will not affect the result.
 If not supplied the `iat` field of the JWT will by used instead.
 Supply a `now` Date object to check the expiry status of a JWT at some other point of time.
 
-## create
+## `@dwbinns/jwt/generate`
+
+### importPrivateKey
 ```javascript
-async function create(keys, claims)
+async function importPrivateKey(jwk)
+async function importPrivateKey(alg, kid, jwk)
+```
+Import a private key from a JWK, returning a `PrivateKeyEntry`. The JWK must contain the private component (`d`).
+With the single-argument form the JWK must contain `alg` and `kid` fields.
+
+### importPemPrivateKey
+```javascript
+async function importPemPrivateKey(alg, kid, pem)
+```
+Import a private key from a PEM string. Supports pkcs8 private keys (`BEGIN PRIVATE KEY`).
+For `BEGIN RSA PRIVATE KEY` (pkcs1) convert first:
+```
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in pkcs1.key -out pkcs8.key
 ```
 
-Create a JWT using the supplied `keys` and `claims`. See first example.
+### create
+```javascript
+async function create(key, claims)
+```
+Create (sign) a JWT using a single `PrivateKeyEntry` and the supplied `claims`. See first example.
 
+## `@dwbinns/jwt/verify`
 
+### verify
+```javascript
+async function verify(keys, text, now = new Date())
+```
+
+Parse and verify a JWT, throwing an error if the JWT is expired, not yet valid or does not have a valid signature.
+Keys should be a `PublicKeyEntry` or an array of them, created via one of the import functions.
+Returns the JWT's claims, see first example.
+
+### importPublicKey
+```javascript
+async function importPublicKey(alg, kid, jwk)
+```
+Import a public key from a JWK, returning a `PublicKeyEntry`. Any private component is stripped before import.
+
+### importPemPublicKey
+```javascript
+async function importPemPublicKey(alg, kid, pem)
+```
+Import a public key from a PEM string. Supports spki public keys (`BEGIN PUBLIC KEY`).
+
+### importHostJWKS
+```javascript
+function importHostJWKS(hostname)
+```
+Import all keys from a key set for a host
+
+### importURLJWKS
+```javascript
+async function importURLJWKS(url)
+```
+Import all keys from a key set from a URL
+
+### importJWKS
+```javascript
+async function importJWKS({ keys })
+```
+Import all keys from a key set

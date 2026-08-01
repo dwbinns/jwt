@@ -1,4 +1,6 @@
-import { create, importJWK, importJWKS, importPem, parse, verify } from "@dwbinns/jwt";
+import { create, importPrivateKey, importPemPrivateKey, type PrivateKeyEntry } from "@dwbinns/jwt/generate";
+import { importJWKS, importPublicKey, verify, type PublicKeyEntry } from "@dwbinns/jwt/verify";
+import { parse } from "@dwbinns/jwt/info";
 import { rejects } from "node:assert";
 import { deepEqual, ok } from "node:assert/strict";
 import test from 'node:test';
@@ -24,19 +26,20 @@ await test("RS256", async () => {
         "qi": "IYd7DHOhrWvxkwPQsRM2tOgrjbcrfvtQJipd-DlcxyVuuM9sQLdgjVk2oy26F0EmpScGLq2MowX7fhd_QJQ3ydy5cY7YIBi87w93IKLEdfnbJtoOPLUW0ITrJReOgo1cq9SbsxYawBgfp_gh6A5603k2-ZQwVK0JKSHuLFkuQ3U"
     };
 
-    let keys = await importJWK("RS256", undefined, rsaJWK);
+    let key: PrivateKeyEntry = await importPrivateKey("RS256", undefined, rsaJWK);
+    let publicKey: PublicKeyEntry = await importPublicKey("RS256", undefined, rsaJWK);
 
     let rsaJWT = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw"
 
-    let { header, claims } = await parse(rsaJWT);
+    let { header, claims } = parse(rsaJWT);
     deepEqual(header, { alg: "RS256" });
     deepEqual(claims, exampleClaims);
 
 
-    deepEqual(await verify(keys[0], rsaJWT, new Date("2010")), exampleClaims);
-    deepEqual(await verify(keys, rsaJWT, new Date("2010")), exampleClaims);
-    await rejects(verify(keys, rsaJWT, new Date("2012")), new Error("JWT expired"));
-    deepEqual(await verify(keys, await create(keys, claims), new Date("2010")), exampleClaims);
+    deepEqual(await verify(publicKey, rsaJWT, new Date("2010")), exampleClaims);
+    deepEqual(await verify([publicKey], rsaJWT, new Date("2010")), exampleClaims);
+    await rejects(verify([publicKey], rsaJWT, new Date("2012")), new Error("JWT expired"));
+    deepEqual(await verify(publicKey, await create(key, claims), new Date("2010")), exampleClaims);
 });
 
 
@@ -60,7 +63,7 @@ await test("JWKS", async () => {
 
         ok(await verify(keys, ecJWT, new Date("2010")));
     } catch (e) {
-        throw new Error(e);
+        throw new Error(String(e));
     }
 });
 
@@ -70,9 +73,10 @@ await test("PEM", async () => {
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDD0tPV/du2vftjvXj1t/gXTK39sNBVrOAEb/jKzXae+Xa0H+3LhZaQIQNMfACiBSgIfZUvEGb+7TqXWQpoLoFR/R7MvGWcSk98JyrVtveD8ZmZYyItSY7m2hcasqAFiKyOouV5vzyRe87/lEyzzBpF3bQQ4IDaQu+K9Hj5fKuU6rrOeOhsdnJc+VdDQLScHxvMoLZ9Vtt+oK9J4/tOLwr4CG8khDlBURcBY6gPcLo3dPU09SW+6ctX2cX4mkXx6O/0mmdTmacr/vu50KdRMleFeZYOWPAEhhMfywybTuzBiPVIZVP8WFCSKNMbfi1S9A9PdBqnebwwHhX3/hsEBt2BAgMBAAECggEABEI1P6nf6Zs7mJlyBDv+Pfl5rjL2cOqLy6TovvZVblMkCPpJyFuNIPDK2tK2i897ZaXfhPDBIKmllM2Hq6jZQKB110OAnTPDg0JxzMiIHPs32S1d/KilHjGff4Hjd4NXp1l1Dp8BUPOllorR2TYm2x6dcCGFw9lhTr8O03Qp4hjn84VjGIWADYCk83mgS4nRsnHkdiqYnWx1AjKlY51yEK6RcrDMi0Th2RXrrINoC35sVv+APt2rkoMGi52RwTEseA1KZGFrxjq61ReJif6p2VXEcvHeX6CWLx014LGk43z6Q28P6HgeEVEfIjyqCUea5Du/mYb/QsRSCosXLxBqwQKBgQD1+fdC9ZiMrVI+km7Nx2CKBn8rJrDmUh5SbXn2MYJdrUd8bYNnZkCgKMgxVXsvJrbmVOrby2txOiqudZkk5mD3E5O/QZWPWQLgRu8ueYNpobAX9NRgNfZ7rZD+81vh5MfZiXfuZOuzv29iZhU0oqyZ9y75eHkLdrerNkwYOe5aUQKBgQDLzapDi1NxkBgsj9iiO4KUa7jvD4JjRqFy4Zhj/jbQvlvM0F/uFp7sxVcHGx4r11C+6iCbhX4u+Zuu0HGjT4d+hNXmgGyxR8fIUVxOlOtDkVJa5sOBZK73/9/MBeKusdmJPRhalZQfMUJRWIoEVDMhfg3tW/rBj5RYAtP2dTVUMQKBgDs8yr52dRmT+BWXoFWwaWB0NhYHSFz/c8v4D4Ip5DJ5M5kUqquxJWksySGQa40sbqnD05fBQovPLU48hfgr/zghn9hUjBcsoZOvoZR4sRw0UztBvA+7jzOz1hKAOyWIulR6Vca0yUrNlJ6G5R56+sRNkiOETupi2dLCzcqb0PoxAoGAZyNHvTLvIZN4iGSrjz5qkM4LIwBIThFadxbv1fq6pt0O/BGf2o+cEdq0diYlGK64cEVwBwSBnSg4vzlBqRIAUejLjwEDAJyA4EE8Y5A9l04dzV7nJb5cRak6CrgXxay/mBJRFtaHxVlaZGxYPGSYE6UFS0+3EOmmevvDZQBf4qECgYEA0ZF6Vavz28+8wLO6SP3w8NmpHk7K9tGEvUfQ30SgDx4G7qPIgfPrbB4OP/E0qCfsIImi3sCPpjvUMQdVVZyPOIMuB+rV3ZOxkrzxEUOrpOpR48FZbL7RN90yRQsAsrp9e4iv8QwB3VxLe7X0TDqqnRyqrc/osGzuS2ZcHOKmCU8=
 -----END PRIVATE KEY-----`;
 
-    let rsaKey = await importPem("RS256", undefined, pemPrivateKey);
+    let rsaKey = await importPemPrivateKey("RS256", undefined, pemPrivateKey);
+    let rsaPublicKey = await importPublicKey("RS256", undefined, await crypto.subtle.exportKey("jwk", rsaKey.privateKey));
 
-    await verify(rsaKey, await create(rsaKey, { sub: "hello" }));
+    await verify(rsaPublicKey, await create(rsaKey, { sub: "hello" }));
 });
 
 await test("ES256", async () => {
@@ -86,7 +90,8 @@ await test("ES256", async () => {
         "d": "jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
     };
 
-    let ecKey = await importJWK("ES256", undefined, ecJWK);
+    let ecKey = await importPrivateKey("ES256", undefined, ecJWK);
+    let ecPublicKey = await importPublicKey("ES256", undefined, ecJWK);
 
     let ecJWT = "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q";
 
@@ -94,8 +99,8 @@ await test("ES256", async () => {
     deepEqual({ alg: "ES256" }, header);
     deepEqual(exampleClaims, claims);
 
-    deepEqual(await verify(ecKey, ecJWT, new Date("2010")), exampleClaims);
+    deepEqual(await verify(ecPublicKey, ecJWT, new Date("2010")), exampleClaims);
 
-    deepEqual(await verify(ecKey, await create(ecKey, claims), new Date("2010")), exampleClaims);
+    deepEqual(await verify(ecPublicKey, await create(ecKey, claims), new Date("2010")), exampleClaims);
 
 });
