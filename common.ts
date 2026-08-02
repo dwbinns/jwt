@@ -1,6 +1,6 @@
 // Shared internals for the @dwbinns/jwt submodules (generate, verify, info).
 
-export type Algorithm = "RS256" | "ES256";
+export type Algorithm = "RS256" | "ES256" | "EdDSA";
 
 export interface JwtHeader {
     alg?: string;
@@ -22,7 +22,7 @@ export interface ParsedJwt {
 }
 
 export interface AlgorithmParameters {
-    importKeyParams: RsaHashedImportParams | EcKeyImportParams;
+    importKeyParams: RsaHashedImportParams | EcKeyImportParams | AlgorithmIdentifier;
     signatureParams: AlgorithmIdentifier | EcdsaParams;
 }
 
@@ -46,7 +46,15 @@ export const algorithms: Record<Algorithm, AlgorithmParameters> = {
             name: "ECDSA",
             hash: "SHA-256",
         }
-    }
+    },
+    "EdDSA": {
+        importKeyParams: {
+            name: "Ed25519"
+        },
+        signatureParams: {
+            name: "Ed25519"
+        }
+     }
 }
 
 export function getParameters(alg: Algorithm): AlgorithmParameters {

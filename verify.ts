@@ -1,7 +1,7 @@
 // JWT verification: public key import and signature/expiry checks.
 
 import * as b64 from "@dwbinns/base/64";
-import { getParameters, type Algorithm, type JwtClaims } from "./common.ts";
+import { getParameters, requireKid, type Algorithm, type JwtClaims } from "./common.ts";
 import { parse } from "./info.ts";
 
 export type { Algorithm, JwtClaims };
@@ -12,11 +12,11 @@ export interface PublicKeyEntry {
     publicKey: CryptoKey;
 }
 
-/** Import a public key from a JWK. Any private component is stripped before import. */
-export async function importPublicKey(alg: Algorithm, kid: string | undefined, jwk: JsonWebKey): Promise<PublicKeyEntry> {
+/** Import a public key from a JWK. */
+export async function importPublicKey(jwk: JsonWebKey): Promise<PublicKeyEntry> {
+    let { alg, kid } = requireKid(jwk as JsonWebKey & { kid?: string; alg?: string });
     let { importKeyParams } = getParameters(alg);
-    let publicJWK = { ...jwk, d: undefined, dp: undefined, dq: undefined, q: undefined, qi: undefined, key_ops: undefined };
-    let publicKey = await crypto.subtle.importKey("jwk", publicJWK, importKeyParams, true, ["verify"]);
+    let publicKey = await crypto.subtle.importKey("jwk", jwk, importKeyParams, true, ["verify"]);
     return { alg, kid, publicKey };
 }
 
@@ -46,9 +46,9 @@ interface Jwks {
 
 /** Import all usable public keys from a JWKS object. Keys without an `alg` are skipped. */
 export async function importJWKS({ keys }: Jwks): Promise<PublicKeyEntry[]> {
-    let imported = await Promise.all(keys.map(async ({ alg, kid, ...jwk }): Promise<PublicKeyEntry | null> => {
-        if (!alg) return null;
-        return await importPublicKey(alg, kid, jwk);
+    let imported = await Promise.all(keys.map(async (jwk: JsonWebKey): Promise<PublicKeyEntry | null> => {
+        if (!jwk.alg) return null;
+        return await importPublicKey(jwk as JsonWebKey & { kid?: string; alg?: string });
     }));
     return imported.filter((key): key is PublicKeyEntry => key !== null);
 }
@@ -76,7 +76,7 @@ export async function verify(keys: PublicKeyEntry | PublicKeyEntry[], text: stri
 
         let { signatureParams } = getParameters(alg);
 
-        if (header.kid != kid || header.alg != alg) {
+        if ((header.kid && header.kid != kid) || header.alg != alg) {
             continue;
         }
 

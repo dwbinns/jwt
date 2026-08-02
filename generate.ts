@@ -13,23 +13,10 @@ export interface PrivateKeyEntry {
 }
 
 /**
- * Import a private key from a JWK. The JWK must contain the private component (`d`).
- * Accepts either (jwk) with embedded alg/kid, or (alg, kid, jwk).
+ * Import a private key from a JWK.
  */
-export async function importPrivateKey(jwk: JsonWebKey): Promise<PrivateKeyEntry>;
-export async function importPrivateKey(alg: Algorithm, kid: string | undefined, jwk: JsonWebKey): Promise<PrivateKeyEntry>;
-export async function importPrivateKey(
-    algOrJwk: Algorithm | JsonWebKey,
-    kid?: string,
-    jwk?: JsonWebKey
-): Promise<PrivateKeyEntry> {
-    let alg: Algorithm;
-    if (typeof algOrJwk === "string") {
-        alg = algOrJwk;
-    } else {
-        jwk = algOrJwk;
-        ({ alg, kid } = requireKid(jwk as JsonWebKey & { kid?: string; alg?: string }));
-    }
+export async function importPrivateKey(jwk: JsonWebKey): Promise<PrivateKeyEntry> {
+    let { alg, kid } = requireKid(jwk as JsonWebKey & { kid?: string; alg?: string });
 
     if (!jwk!.d) throw new Error("JWK does not contain a private key");
 
